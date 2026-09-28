@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko"><head>
 <meta charset="utf-8">
-<!-- 코드명: 지비스 사용량 PWA | index.html | @version 1.0.0 -->
+<!-- 코드명: 지비스 사용량 PWA | index.html | @version 1.0.1 -->
 <!-- 폰을 PC 옆에 두고 보는 화면 — 지비스가 올린 Claude·Gemini 사용량과 LG·아수스 PC 의 CPU·램을 10초마다 받아 그린다.
      주소·열쇠는 이 저장소에 없다: 폰에서 «연결 코드» 를 한 번 붙여넣으면 그 폰(localStorage)에만 저장된다. -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -77,7 +77,7 @@ textarea{width:100%;min-height:96px;border-radius:10px;border:1px solid var(--li
 <script>
 (function () {
 'use strict';
-var VER = '1.0.0', POLL_MS = 10000, ONLINE_MS = 60000, STALE_AI_MS = 15 * 60000;
+var VER = '1.0.1', POLL_MS = 10000, ONLINE_MS = 60000, STALE_AI_MS = 15 * 60000;
 var THEMES = [['ghost', '고스트'], ['black', '블랙'], ['slatelight', '슬레이트 라이트'], ['chillwhite', '칠화이트'], ['night', '나이트'], ['gold', '금박']];
 var S = { conn: null, snap: null, fetchedAt: 0, err: '', theme: 'slatelight', wake: true, sheet: false, confirmOff: false, codeErr: '' };
 var app = document.getElementById('app'), wl = null, timer = null, busy = false;
@@ -240,7 +240,12 @@ function release() { if (wl) { wl.release().catch(function () {}); wl = null; } 
 /* ── 시작 ── */
 var th0 = ls('jvu_theme'); setTheme(THEMES.some(function (t) { return t[0] === th0; }) ? th0 : 'slatelight');
 S.wake = ls('jvu_wake') !== '0';
-var hashCode = parseCode(location.hash); if (hashCode) { ls('jvu_conn', JSON.stringify(hashCode)); try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* 무시 */ } }
+/* ★ 주소 뒤 코드는 «지우지 않는다» — 아이폰 사파리의 «홈 화면에 추가»는 그 순간 주소창의 URL 을
+   그대로 아이콘에 저장한다. 여기서 지워 버리면(예전엔 history.replaceState 로 지웠음) 정작
+   «홈 화면에 추가»를 누르는 시점엔 이미 코드 없는 민짜 주소만 남아 있어서, 그 아이콘으로 다시
+   열 때마다 코드를 새로 넣으라고 나왔다(2026-09-28 실측). 화면 자체는 전체 화면(standalone)
+   모드라 평소엔 주소창이 안 보이므로 지저분해 보이는 것도 아니다. */
+var hashCode = parseCode(location.hash); if (hashCode) { ls('jvu_conn', JSON.stringify(hashCode)); }
 try { S.conn = JSON.parse(ls('jvu_conn') || 'null'); if (S.conn && !parseCode('JVUSG1:' + btoa(unescape(encodeURIComponent(JSON.stringify(S.conn)))))) S.conn = null; } catch (e) { S.conn = null; }
 try { var last = JSON.parse(ls('jvu_last') || 'null'); if (last && last.snap && S.conn) { S.snap = last.snap; S.fetchedAt = last.at; } } catch (e) { /* 무시 */ }
 paint();
