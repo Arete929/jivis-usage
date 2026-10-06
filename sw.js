@@ -1,5 +1,5 @@
 /* 지비스 사용량 — 서비스워커. 화면 뼈대만 저장해 두고(오프라인에서도 켜지게), 중계 요청은 절대 가로채지 않는다 */
-var CACHE = 'jvu-v1.1.2';
+var CACHE = 'jvu-v1.2.0';
 var FILES = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/favicon-32.png'];
 self.addEventListener('install', function (e) { e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(FILES); }).then(function () { return self.skipWaiting(); })); });
 self.addEventListener('activate', function (e) {
