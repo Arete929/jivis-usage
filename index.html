@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko"><head>
 <meta charset="utf-8">
-<!-- 코드명: 지비스 사용량 PWA | index.html | @version 1.0.1 -->
+<!-- 코드명: 지비스 사용량 PWA | index.html | @version 1.1.1 -->
 <!-- 폰을 PC 옆에 두고 보는 화면 — 지비스가 올린 Claude·Gemini 사용량과 LG·아수스 PC 의 CPU·램을 10초마다 받아 그린다.
      주소·열쇠는 이 저장소에 없다: 폰에서 «연결 코드» 를 한 번 붙여넣으면 그 폰(localStorage)에만 저장된다. -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -77,7 +77,7 @@ textarea{width:100%;min-height:96px;border-radius:10px;border:1px solid var(--li
 <script>
 (function () {
 'use strict';
-var VER = '1.0.1', POLL_MS = 10000, ONLINE_MS = 60000, STALE_AI_MS = 15 * 60000;
+var VER = '1.1.1', POLL_MS = 10000, ONLINE_MS = 60000, STALE_AI_MS = 15 * 60000;
 var THEMES = [['ghost', '고스트'], ['black', '블랙'], ['slatelight', '슬레이트 라이트'], ['chillwhite', '칠화이트'], ['night', '나이트'], ['gold', '금박']];
 var S = { conn: null, snap: null, fetchedAt: 0, err: '', theme: 'slatelight', wake: true, sheet: false, confirmOff: false, codeErr: '' };
 var app = document.getElementById('app'), wl = null, timer = null, busy = false;
@@ -106,13 +106,39 @@ function tone(p) { var T = isDark() ? TD : TL, c = T[0][1]; T.forEach(function (
 /* ── 시간 ── */
 function nowSrv() { return S.snap ? S.snap.now + (Date.now() - S.fetchedAt) : Date.now(); }
 function ago(ms) { var s = Math.max(0, Math.round(ms / 1000)); if (s < 60) return s + '초 전'; var m = Math.floor(s / 60); if (m < 60) return m + '분 전'; var h = Math.floor(m / 60); return h < 24 ? h + '시간 전' : Math.floor(h / 24) + '일 전'; }
+function fmtReset(ts) {                                                      // 10/5(월) 23:00 — 폰의 현재 시간대 그대로
+  var d = new Date(ts), dow = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+  var p2 = function (n) { return (n < 10 ? '0' : '') + n; };
+  return (d.getMonth() + 1) + '/' + d.getDate() + '(' + dow + ') ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+}
+/* ★ 주간 한도는 «목요일 오후 11:00» 처럼 요일이 붙어 온다. 옛 PC 지비스는 시각만 읽어 «오늘 23:00» 으로 계산해
+   (목요일 초기화가 «46분 남음» 으로 보였다, 2026-10-06) — 그래서 폰도 문구에 요일·날짜가 있으면 문구를 따른다. */
+function resetFromText(t, nowMs) {
+  var s = String(t || ''), m = s.match(/(오전|오후|AM|PM)?\s*(\d{1,2})\s*:\s*(\d{2})\s*(AM|PM)?/i);
+  if (!m || /\d+\s*(?:시간|분|hours?|hrs?|mins?|minutes?)\s*(?:후|뒤|later)?/i.test(s.replace(/\d+\s*월\s*\d+\s*일/, ''))) return null;
+  var h = Number(m[2]), ap = (m[1] || m[4] || '').toUpperCase(), min = Number(m[3]), now = new Date(nowMs);
+  if (ap === '오후' || ap === 'PM') { if (h < 12) h += 12; } if (ap === '오전' || ap === 'AM') { if (h === 12) h = 0; }
+  var md = s.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+  if (md) { var d1 = new Date(now.getFullYear(), Number(md[1]) - 1, Number(md[2]), h, min, 0, 0); if (d1.getTime() <= nowMs) d1.setFullYear(d1.getFullYear() + 1); return d1.getTime(); }
+  var dow = -1, ko = s.match(/([일월화수목금토])\s*요일/) || s.match(/(?:^|[\s(])([일월화수목금토])(?=[\s)\d]|오전|오후|$)/);
+  if (ko) dow = '일월화수목금토'.indexOf(ko[1]);
+  else { var en = s.match(/\b(sun|mon|tue|wed|thu|fri|sat)[a-z]*\b/i); if (en) dow = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(en[1].toLowerCase()); }
+  if (dow < 0) return null;                                   // 요일·날짜가 없으면 PC 가 보낸 값을 믿는다
+  var at = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, min, 0, 0);
+  at.setDate(at.getDate() + ((dow - now.getDay() + 7) % 7));
+  if (at.getTime() <= nowMs) at.setDate(at.getDate() + 7);
+  return at.getTime();
+}
 function remain(w) {
+  var fix = resetFromText(w.resetRel || w.reset, nowSrv());
+  if (fix) w = { resetAt: fix };
   if (w.resetAt) {
     var ms = w.resetAt - nowSrv(); if (ms <= 0) return '초기화됨';
-    var m = Math.floor(ms / 60000), h = Math.floor(m / 60), days = ms / 86400000;
-    if (days >= 1.95) return Math.round(days) + '일 남음';                       // 2.99일 → 3일 (내림하면 «2일» 로 보인다)
-    if (days >= 1) return '1일 ' + (h % 24) + '시간 남음';
-    if (h >= 1) return h + '시간 ' + (m % 60) + '분 남음'; return m + '분 남음';
+    var m = Math.floor(ms / 60000), h = Math.floor(m / 60), days = ms / 86400000, t;
+    if (days >= 1.95) t = Math.round(days) + '일 남음';                       // 2.99일 → 3일 (내림하면 «2일» 로 보인다)
+    else if (days >= 1) t = '1일 ' + (h % 24) + '시간 남음';
+    else if (h >= 1) t = h + '시간 ' + (m % 60) + '분 남음'; else t = m + '분 남음';
+    return t + ' (' + fmtReset(w.resetAt) + ')';
   }
   return w.resetRel ? String(w.resetRel).replace(/후$/, '남음') : '';
 }
