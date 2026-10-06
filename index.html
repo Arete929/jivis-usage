@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko"><head>
 <meta charset="utf-8">
-<!-- 코드명: 지비스 사용량 PWA | index.html | @version 1.1.1 -->
+<!-- 코드명: 지비스 사용량 PWA | index.html | @version 1.1.2 -->
 <!-- 폰을 PC 옆에 두고 보는 화면 — 지비스가 올린 Claude·Gemini 사용량과 LG·아수스 PC 의 CPU·램을 10초마다 받아 그린다.
      주소·열쇠는 이 저장소에 없다: 폰에서 «연결 코드» 를 한 번 붙여넣으면 그 폰(localStorage)에만 저장된다. -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -28,10 +28,12 @@
 html,body{margin:0;background:var(--bg);color:var(--fg);font-family:"Pretendard Variable",Pretendard,-apple-system,"Segoe UI","Malgun Gothic",system-ui,sans-serif;-webkit-text-size-adjust:100%}
 body{padding:max(14px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));min-height:100vh;min-height:100dvh}
 button{font:inherit;color:inherit;cursor:pointer}
-.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 2px 12px}
+.top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px 10px;margin:0 2px 12px}
+.tl{display:flex;align-items:baseline;gap:7px;min-width:0}
+.ver{font-size:12px;font-weight:600;color:var(--dim);white-space:nowrap}
 .top b{font-size:17px;font-weight:700}
 .tr{display:flex;align-items:center;gap:10px}
-.conn{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--now);white-space:nowrap}
+.conn{display:flex;align-items:center;gap:6px;font-size:clamp(11px,3vw,12px);color:var(--now);white-space:nowrap}
 .conn i{width:8px;height:8px;border-radius:50%;background:var(--now);display:inline-block}
 .conn.warn{color:#b76e00}.conn.warn i{background:#e6a030}
 .conn.bad{color:#c22222}.conn.bad i{background:#e04040}
@@ -41,15 +43,18 @@ button{font:inherit;color:inherit;cursor:pointer}
 @media (min-width:1000px){.gr{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);max-width:1100px;margin:0 auto}}
 .col{display:grid;gap:12px;align-content:start}
 .cd{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 12px 10px}
-.hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+.hd{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:2px 8px;margin-bottom:6px}
 .hd b{font-size:15px;font-weight:700}
 .hd b.tt{display:flex;align-items:center;gap:7px}
 .lg{flex:0 0 auto}
 .rw{display:flex;gap:6px;justify-content:space-around}
-.rg{text-align:center;flex:1;min-width:0}
+.rg{text-align:center;flex:1 1 0;min-width:0}
 .rg svg{max-width:100%;height:auto}
-.lb{font-size:12px;color:var(--fg2);margin-top:2px}
-.sb{font-size:11px;color:var(--dim)}
+.lb{font-size:clamp(11px,3vw,12.5px);color:var(--fg2);margin-top:2px}
+.sb{font-size:clamp(10px,2.9vw,11.5px);color:var(--dim);overflow-wrap:anywhere}
+.rg .sb.rm{margin-top:1px;color:var(--fg2)}
+.rg .sb.at{margin-top:1px}
+.nb{display:inline-block;white-space:nowrap}
 .sb.old{color:#b76e00}
 .bar{height:9px;border-radius:5px;background:var(--card2);overflow:hidden}
 .bar i{display:block;height:100%;border-radius:5px;transition:width .5s}
@@ -77,7 +82,7 @@ textarea{width:100%;min-height:96px;border-radius:10px;border:1px solid var(--li
 <script>
 (function () {
 'use strict';
-var VER = '1.1.1', POLL_MS = 10000, ONLINE_MS = 60000, STALE_AI_MS = 15 * 60000;
+var VER = '1.1.2', POLL_MS = 10000, ONLINE_MS = 60000, STALE_AI_MS = 15 * 60000;
 var THEMES = [['ghost', '고스트'], ['black', '블랙'], ['slatelight', '슬레이트 라이트'], ['chillwhite', '칠화이트'], ['night', '나이트'], ['gold', '금박']];
 var S = { conn: null, snap: null, fetchedAt: 0, err: '', theme: 'slatelight', wake: true, sheet: false, confirmOff: false, codeErr: '' };
 var app = document.getElementById('app'), wl = null, timer = null, busy = false;
@@ -106,6 +111,11 @@ function tone(p) { var T = isDark() ? TD : TL, c = T[0][1]; T.forEach(function (
 /* ── 시간 ── */
 function nowSrv() { return S.snap ? S.snap.now + (Date.now() - S.fetchedAt) : Date.now(); }
 function ago(ms) { var s = Math.max(0, Math.round(ms / 1000)); if (s < 60) return s + '초 전'; var m = Math.floor(s / 60); if (m < 60) return m + '분 전'; var h = Math.floor(m / 60); return h < 24 ? h + '시간 전' : Math.floor(h / 24) + '일 전'; }
+function fmtResetParts(ts) {                                               // [«10/6(화)», «13:50»]
+  var d = new Date(ts), dow = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+  var p2 = function (n) { return (n < 10 ? '0' : '') + n; };
+  return [(d.getMonth() + 1) + '/' + d.getDate() + '(' + dow + ')', p2(d.getHours()) + ':' + p2(d.getMinutes())];
+}
 function fmtReset(ts) {                                                      // 10/5(월) 23:00 — 폰의 현재 시간대 그대로
   var d = new Date(ts), dow = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
   var p2 = function (n) { return (n < 10 ? '0' : '') + n; };
@@ -129,18 +139,19 @@ function resetFromText(t, nowMs) {
   if (at.getTime() <= nowMs) at.setDate(at.getDate() + 7);
   return at.getTime();
 }
-function remain(w) {
+function remain(w) {                                                          // → [«3시간 14분 남음», «10/6(화)», «13:50»] (시각 없으면 뒤 둘은 빈 글자)
   var fix = resetFromText(w.resetRel || w.reset, nowSrv());
   if (fix) w = { resetAt: fix };
   if (w.resetAt) {
-    var ms = w.resetAt - nowSrv(); if (ms <= 0) return '초기화됨';
+    var ms = w.resetAt - nowSrv(); if (ms <= 0) return ['초기화됨', '', ''];
     var m = Math.floor(ms / 60000), h = Math.floor(m / 60), days = ms / 86400000, t;
     if (days >= 1.95) t = Math.round(days) + '일 남음';                       // 2.99일 → 3일 (내림하면 «2일» 로 보인다)
     else if (days >= 1) t = '1일 ' + (h % 24) + '시간 남음';
     else if (h >= 1) t = h + '시간 ' + (m % 60) + '분 남음'; else t = m + '분 남음';
-    return t + ' (' + fmtReset(w.resetAt) + ')';
+    var ap = fmtResetParts(w.resetAt);
+    return [t, ap[0], ap[1]];
   }
-  return w.resetRel ? String(w.resetRel).replace(/후$/, '남음') : '';
+  return [w.resetRel ? String(w.resetRel).replace(/후$/, '남음') : '', '', ''];
 }
 
 /* ── 그리기 ── */
@@ -148,7 +159,12 @@ function ring(p, s) {
   var r = s / 2 - 6, c = 2 * Math.PI * r, d = c * (1 - p / 100), h = s / 2;
   return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s + '" role="img" aria-label="' + p + '퍼센트"><circle cx="' + h + '" cy="' + h + '" r="' + r + '" fill="none" stroke="var(--card2)" stroke-width="7"/><circle cx="' + h + '" cy="' + h + '" r="' + r + '" fill="none" stroke="' + tone(p) + '" stroke-width="7" stroke-linecap="round" stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + d.toFixed(1) + '" transform="rotate(-90 ' + h + ' ' + h + ')"/><text x="' + h + '" y="' + (h + 6) + '" text-anchor="middle" font-size="18" font-weight="700" fill="var(--fg)">' + Math.round(p) + '</text></svg>';
 }
-function item(name, w) { return '<div class="rg">' + ring(w.pct, 74) + '<div class="lb">' + name + '</div><div class="sb">' + esc(remain(w)) + '</div></div>'; }
+function item(name, w) {
+  var r = remain(w);
+  /* 첫 줄: 남은 시간. 둘째 줄: (날짜 시각) — 좁으면 날짜와 시각 «사이» 에서만 줄이 바뀐다(글자가 쪼개져 잘리지 않게) */
+  return '<div class="rg">' + ring(w.pct, 74) + '<div class="lb">' + name + '</div><div class="sb rm">' + esc(r[0]) + '</div>'
+    + (r[1] ? '<div class="sb at"><span class="nb">(' + esc(r[1]) + '</span> <span class="nb">' + esc(r[2]) + ')</span></div>' : '') + '</div>';
+}
 /* 서비스 로고 — Claude 는 주황 방사형 별, Gemini 는 파랑→보라 네 갈래 반짝이(둘 다 단순화한 모양) */
 var LOGO_N = 0;
 function logo(kind) {
@@ -187,7 +203,7 @@ function connState() {
   return ['', '연결됨 · ' + ago(Date.now() - S.fetchedAt)];
 }
 function setupView() {
-  return '<div class="top"><b>지비스 사용량</b></div><div class="msg"><h2>연결 코드를 붙여넣어 주세요</h2>PC 지비스가 만든 «폰 사용량 연결 코드»를 한 번만 넣으면 이 폰에 기억돼요.'
+  return '<div class="top"><div class="tl"><b>지비스 사용량</b><small class="ver">v' + VER + '</small></div></div><div class="msg"><h2>연결 코드를 붙여넣어 주세요</h2>PC 지비스가 만든 «폰 사용량 연결 코드»를 한 번만 넣으면 이 폰에 기억돼요.'
     + '<textarea id="code" placeholder="JVUSG1:…" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea><div class="err" id="cerr">' + esc(S.codeErr) + '</div>'
     + '<button class="btn" id="go">연결하기</button></div>';
 }
@@ -198,7 +214,7 @@ function settingsView() {
 }
 function mainView() {
   var cs = connState(), snap = S.snap, h = '';
-  h += '<div class="top"><b>지비스 사용량</b><div class="tr"><div class="conn ' + cs[0] + '"><i></i>' + cs[1] + '</div><button class="gear" id="gear" aria-label="설정">⚙</button></div></div>';
+  h += '<div class="top"><div class="tl"><b>지비스 사용량</b><small class="ver">v' + VER + '</small></div><div class="tr"><div class="conn ' + cs[0] + '"><i></i>' + cs[1] + '</div><button class="gear" id="gear" aria-label="설정">⚙</button></div></div>';
   if (S.sheet) h += settingsView();
   if (!snap) return h + '<div class="msg">' + (S.err ? '중계에 연결하지 못했어요.<br>' + esc(S.err) + '<br>잠시 뒤 자동으로 다시 시도해요.' : '값을 불러오는 중…') + '</div>';
   var ai = snap.ai && snap.ai.data ? snap.ai : null, left = '';
