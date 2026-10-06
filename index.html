@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko"><head>
 <meta charset="utf-8">
-<!-- 코드명: 지비스 사용량 PWA | index.html | @version 1.2.0 -->
+<!-- 코드명: 지비스 사용량 PWA | index.html | @version 1.3.0 -->
 <!-- 폰을 PC 옆에 두고 보는 화면 — 지비스가 올린 Claude·Gemini 사용량과 LG·아수스 PC 의 CPU·램을 10초마다 받아 그린다.
      주소·열쇠는 이 저장소에 없다: 폰에서 «연결 코드» 를 한 번 붙여넣으면 그 폰(localStorage)에만 저장된다. -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -82,13 +82,18 @@ textarea{width:100%;min-height:96px;border-radius:10px;border:1px solid var(--li
 <script>
 (function () {
 'use strict';
-var VER = '1.2.0', POLL_MS = 10000, ONLINE_MS = 60000, STALE_AI_MS = 15 * 60000;
+var VER = '1.3.0', POLL_MS = 10000, ONLINE_MS = 60000, STALE_AI_MS = 15 * 60000;
 var THEMES = [['ghost', '고스트'], ['black', '블랙'], ['slatelight', '슬레이트 라이트'], ['chillwhite', '칠화이트'], ['night', '나이트'], ['gold', '금박']];
-var S = { conn: null, snap: null, fetchedAt: 0, err: '', theme: 'slatelight', wake: true, sheet: false, confirmOff: false, codeErr: '' };
+var S = { isDef: false, manual: false, conn: null, snap: null, fetchedAt: 0, err: '', theme: 'slatelight', wake: true, sheet: false, confirmOff: false, codeErr: '' };
 var app = document.getElementById('app'), wl = null, timer = null, busy = false;
 
 function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* 저장 막힌 브라우저 */ } return null; }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+/* ── 기본 연결 (연결 코드 없이 열리게) ──
+   ★ 공개 저장소에 들어가는 값이다 — 그래서 «읽기 전용 열쇠» 만 넣는다. 읽기(api=get)만 되고 PC 가 올리는 쓰기(POST)는 거절된다.
+     쓰기 열쇠(진짜 열쇠)는 여기 없다. 폰에서 직접 «연결 코드» 를 넣으면 그것이 기본 연결보다 먼저 쓰인다. */
+var DEF = { u: 'https://script.google.com/macros/s/AKfycbxSo2JG7SdQcuBMiurOMOv8mUzSEcggckDho5AFDcnnyLP44F5Tn7wx8lB2Z5gCOKixaw/exec', k: 'jvrbM0Dn6XIXvoAK3pmXWayC5CN' };
 
 /* ── 연결 코드 ── */
 function parseCode(raw) {
@@ -205,12 +210,12 @@ function connState() {
 function setupView() {
   return '<div class="top"><div class="tl"><b>지비스 사용량</b><small class="ver">v' + VER + '</small></div></div><div class="msg"><h2>연결 코드를 붙여넣어 주세요</h2>PC 지비스가 만든 «폰 사용량 연결 코드»를 한 번만 넣으면 이 폰에 기억돼요.'
     + '<textarea id="code" placeholder="JVUSG1:…" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea><div class="err" id="cerr">' + esc(S.codeErr) + '</div>'
-    + '<button class="btn" id="go">연결하기</button></div>';
+    + '<button class="btn" id="go">연결하기</button>' + (S.conn ? '<button class="btn sec" id="godef">기본 연결로 돌아가기</button>' : '') + '</div>';
 }
 function settingsView() {
   return '<div class="sheet"><div class="row"><h3>테마</h3><div class="chips" id="th">' + THEMES.map(function (t) { return '<button data-t="' + t[0] + '"' + (S.theme === t[0] ? ' class="on"' : '') + '>' + t[1] + '</button>'; }).join('') + '</div></div>'
     + '<div class="row"><h3>화면 꺼짐 방지</h3><div class="chips"><button id="wk"' + (S.wake ? ' class="on"' : '') + '>' + (S.wake ? '켜짐' : '꺼짐') + '</button></div></div>'
-    + '<div class="row" style="margin:0"><h3>연결</h3><button class="btn sec" id="off" style="margin-top:0">' + (S.confirmOff ? '정말 해제할까요? 한 번 더 누르세요' : '연결 해제(다른 코드로 바꾸기)') + '</button></div></div>';
+    + '<div class="row" style="margin:0"><h3>연결</h3><button class="btn sec" id="off" style="margin-top:0">' + (S.isDef ? '연결 코드 직접 넣기' : (S.confirmOff ? '정말 해제할까요? 한 번 더 누르세요' : '연결 해제(기본 연결로 돌아가기)')) + '</button>' + (S.isDef ? '<div class="sb" style="margin-top:6px">기본 연결(읽기 전용)로 보고 있어요. 코드는 안 넣어도 돼요.</div>' : '') + '</div></div>';
 }
 function mainView() {
   var cs = connState(), snap = S.snap, h = '';
@@ -230,7 +235,7 @@ function mainView() {
   return h + '<div class="foot">지비스 사용량 v' + VER + ' · 10초마다 갱신</div>';
 }
 function paint() {
-  if (!S.conn) { app.innerHTML = setupView(); var g = document.getElementById('go'); if (g) g.onclick = connect; return; }
+  if (!S.conn || S.manual) { app.innerHTML = setupView(); var g = document.getElementById('go'); if (g) g.onclick = connect; var gd = document.getElementById('godef'); if (gd) gd.onclick = useDefault; return; }
   var keep = document.activeElement && document.activeElement.id;
   app.innerHTML = mainView();
   bind();
@@ -265,8 +270,9 @@ function bind() {
   var th = document.getElementById('th'); if (th) [].forEach.call(th.querySelectorAll('button'), function (b) { b.onclick = function () { setTheme(b.dataset.t); paint(); }; });
   var wk = document.getElementById('wk'); if (wk) wk.onclick = function () { S.wake = !S.wake; ls('jvu_wake', S.wake ? '1' : '0'); if (S.wake) wake(); else release(); paint(); };
   var off = document.getElementById('off'); if (off) off.onclick = function () {
+    if (S.isDef) { S.manual = true; S.sheet = false; paint(); return; }                  // 기본 연결 중 → 직접 넣는 화면
     if (!S.confirmOff) { S.confirmOff = true; paint(); return; }
-    ls('jvu_conn', null); S.conn = null; S.snap = null; S.fetchedAt = 0; S.sheet = false; S.confirmOff = false; stopPoll(); paint();
+    ls('jvu_conn', null); S.sheet = false; S.confirmOff = false; stopPoll(); useDefault();   // 직접 넣은 코드를 지우면 기본 연결로
   };
 }
 function setTheme(t) {
@@ -291,10 +297,14 @@ function fetchSnap() {
 }
 function startPoll() { stopPoll(); fetchSnap(); timer = setInterval(function () { if (document.visibilityState === 'visible') fetchSnap(); else paint(); }, POLL_MS); }
 function stopPoll() { if (timer) { clearInterval(timer); timer = null; } }
+function useDefault() {
+  S.conn = { u: DEF.u, k: DEF.k }; S.isDef = true; S.manual = false; S.snap = null; S.fetchedAt = 0; S.err = ''; S.codeErr = '';
+  paint(); startPoll();
+}
 function connect() {
   var el = document.getElementById('code'), c = parseCode(el && el.value);
   if (!c) { S.codeErr = '연결 코드가 맞지 않아요. JVUSG1: 로 시작하는 전체를 붙여넣어 주세요.'; paint(); return; }
-  S.codeErr = ''; S.conn = c; ls('jvu_conn', JSON.stringify(c)); S.snap = null; S.fetchedAt = 0; S.err = ''; paint(); startPoll();
+  S.codeErr = ''; S.conn = c; S.isDef = false; S.manual = false; ls('jvu_conn', JSON.stringify(c)); S.snap = null; S.fetchedAt = 0; S.err = ''; paint(); startPoll();
 }
 
 /* ── 화면 꺼짐 방지 ── */
@@ -314,6 +324,7 @@ S.wake = ls('jvu_wake') !== '0';
    모드라 평소엔 주소창이 안 보이므로 지저분해 보이는 것도 아니다. */
 var hashCode = parseCode(location.hash); if (hashCode) { ls('jvu_conn', JSON.stringify(hashCode)); }
 try { S.conn = JSON.parse(ls('jvu_conn') || 'null'); if (S.conn && !parseCode('JVUSG1:' + btoa(unescape(encodeURIComponent(JSON.stringify(S.conn)))))) S.conn = null; } catch (e) { S.conn = null; }
+if (!S.conn) { S.conn = { u: DEF.u, k: DEF.k }; S.isDef = true; }
 try { var last = JSON.parse(ls('jvu_last') || 'null'); if (last && last.snap && S.conn) { S.snap = last.snap; S.fetchedAt = last.at; } } catch (e) { /* 무시 */ }
 paint();
 if (S.conn) startPoll();
