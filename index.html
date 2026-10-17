@@ -1,7 +1,8 @@
 <!doctype html>
 <html lang="ko"><head>
 <meta charset="utf-8">
-<!-- 코드명: 지비스 사용량 PWA | index.html | @version 1.3.0 -->
+<!-- 코드명: 지비스 사용량 PWA | index.html | @version 1.4.0 -->
+<!-- v1.4.0 서비스 이름 밑에 «로그인한 계정» — 기본(공개 읽기 열쇠) 연결에서는 가려서(ma••••••29@gmail.com), 연결 코드로 연결하면 전체 주소가 보인다 -->
 <!-- 폰을 PC 옆에 두고 보는 화면 — 지비스가 올린 Claude·Gemini 사용량과 LG·아수스 PC 의 CPU·램을 10초마다 받아 그린다.
      주소·열쇠는 이 저장소에 없다: 폰에서 «연결 코드» 를 한 번 붙여넣으면 그 폰(localStorage)에만 저장된다. -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -56,6 +57,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 .rg .sb.at{margin-top:1px}
 .nb{display:inline-block;white-space:nowrap}
 .sb.old{color:#b76e00}
+.ac{display:flex;align-items:center;flex-wrap:wrap;gap:2px 6px;margin:-2px 0 6px;font-size:clamp(10.5px,3vw,12px);color:var(--fg2);overflow-wrap:anywhere}
+.ac b{font-weight:600;color:var(--fg)}
+.ac em{font-style:normal;font-size:.92em;color:var(--dim)}
 .bar{height:9px;border-radius:5px;background:var(--card2);overflow:hidden}
 .bar i{display:block;height:100%;border-radius:5px;transition:width .5s}
 .pcs{display:grid;gap:12px;align-content:start}
@@ -82,7 +86,7 @@ textarea{width:100%;min-height:96px;border-radius:10px;border:1px solid var(--li
 <script>
 (function () {
 'use strict';
-var VER = '1.3.0', POLL_MS = 10000, ONLINE_MS = 60000, STALE_AI_MS = 15 * 60000;
+var VER = '1.4.0', POLL_MS = 10000, ONLINE_MS = 60000, STALE_AI_MS = 15 * 60000;
 var THEMES = [['ghost', '고스트'], ['black', '블랙'], ['slatelight', '슬레이트 라이트'], ['chillwhite', '칠화이트'], ['night', '나이트'], ['gold', '금박']];
 var S = { isDef: false, manual: false, conn: null, snap: null, fetchedAt: 0, err: '', theme: 'slatelight', wake: true, sheet: false, confirmOff: false, codeErr: '' };
 var app = document.getElementById('app'), wl = null, timer = null, busy = false;
@@ -184,12 +188,18 @@ function logo(kind) {
   }
   return '';
 }
+/* 로그인한 계정 — 가려서 온 것(acctMasked)이면 «일부만 보임» 을 알려 준다. 연결 코드로 연결하면 전체가 온다. */
+function acctLine(u) {
+  if (!u || !u.account || u.needsLogin) return '';
+  var t = String(u.account).slice(0, 120);
+  return '<div class="ac" title="' + (u.acctMasked ? '일부를 가려서 보여 줘요. 연결 코드로 연결하면 전체 주소가 보여요' : 'PC 지비스가 사용량을 읽는 계정') + '"><b>' + esc(t) + '</b>' + (u.acctMasked ? '<em>(일부 가림)</em>' : '') + '</div>';
+}
 function aiCard(title, color, u, aiTs, devName, kind) {
   var wins = [['5시간', u.session], ['주간', u.weekly], ['Fable', u.fable]].filter(function (x) { return x[1]; });
   var age = aiTs ? nowSrv() - aiTs : 0, old = age > STALE_AI_MS;
   var body = u.needsLogin && !wins.length ? '<div class="sb" style="padding:10px 0;font-size:13px">PC 지비스에서 로그인이 필요해요</div>'
     : (wins.length ? '<div class="rw">' + wins.map(function (x) { return item(x[0], x[1]); }).join('') + '</div>' : '<div class="sb" style="padding:10px 0">아직 값이 없어요</div>');
-  return '<div class="cd"><div class="hd"><b class="tt" style="color:' + color + '">' + logo(kind) + esc(title) + '</b><span class="sb' + (old ? ' old' : '') + '">' + (aiTs ? ago(age) + ' 갱신' : '') + (devName ? ' · ' + esc(devName) : '') + '</span></div>' + body + '</div>';
+  return '<div class="cd"><div class="hd"><b class="tt" style="color:' + color + '">' + logo(kind) + esc(title) + '</b><span class="sb' + (old ? ' old' : '') + '">' + (aiTs ? ago(age) + ' 갱신' : '') + (devName ? ' · ' + esc(devName) : '') + '</span></div>' + acctLine(u) + body + '</div>';
 }
 function meter(n, p) { return '<div class="mt"><div class="r"><span style="color:var(--dim)">' + n + '</span><b style="color:' + tone(p) + '">' + Math.round(p) + '%</b></div><div class="bar"><i style="width:' + Math.max(0, Math.min(100, p)) + '%;background:' + tone(p) + '"></i></div></div>'; }
 function pcCard(d) {
