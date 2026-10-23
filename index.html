@@ -1,7 +1,8 @@
 <!doctype html>
 <html lang="ko"><head>
 <meta charset="utf-8">
-<!-- 코드명: 지비스 사용량 PWA | index.html | @version 1.4.0 -->
+<!-- 코드명: 지비스 사용량 PWA | index.html | @version 1.4.1 -->
+<!-- v1.4.1 폰을 가로로 눕혀도(아이폰8 667x375 등) Claude·Gemini 가 잘리지 않게 — 낮은 가로 화면에서는 AI 카드를 나란히 놓고 원을 화면 높이에 맞춰 줄이며 PC 카드는 그 아래 두 칸으로 -->
 <!-- v1.4.0 서비스 이름 밑에 «로그인한 계정» — 기본(공개 읽기 열쇠) 연결에서는 가려서(ma••••••29@gmail.com), 연결 코드로 연결하면 전체 주소가 보인다 -->
 <!-- 폰을 PC 옆에 두고 보는 화면 — 지비스가 올린 Claude·Gemini 사용량과 LG·아수스 PC 의 CPU·램을 10초마다 받아 그린다.
      주소·열쇠는 이 저장소에 없다: 폰에서 «연결 코드» 를 한 번 붙여넣으면 그 폰(localStorage)에만 저장된다. -->
@@ -80,13 +81,32 @@ textarea{width:100%;min-height:96px;border-radius:10px;border:1px solid var(--li
 .chips button{font-size:13px;padding:6px 12px;border-radius:99px;border:1px solid var(--line);background:transparent}
 .chips button.on{background:var(--accent);border-color:var(--accent);color:var(--on)}
 .row{margin:0 0 14px}
+/* ── 낮은 가로 화면(폰을 눕힘) — 세로 스크롤 없이 한눈에: AI 카드 나란히 · 원은 화면 높이에 맞춰 작게 · PC 는 아래 두 칸 ── */
+.rg svg{width:min(74px,100%)}
+@media (orientation:landscape) and (max-height:520px){
+  body{padding-top:max(8px,env(safe-area-inset-top));padding-bottom:max(8px,env(safe-area-inset-bottom))}
+  .top{margin-bottom:6px}
+  .gear{width:30px;height:30px}
+  .gr,.gr{grid-template-columns:minmax(0,1fr);gap:8px;max-width:none}
+  .col{grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:8px}
+  .col>.msg{grid-column:1/-1}
+  .pcs{grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:8px}
+  .cd{padding:8px 10px 6px}
+  .hd{margin-bottom:2px}
+  .hd b{font-size:14px}
+  .rg svg{width:clamp(36px,min(13vh,15vw),62px);height:auto}
+  .lb{font-size:clamp(10px,2.9vh,12px);margin-top:0}
+  .sb{font-size:clamp(9.5px,2.6vh,11px)}
+  .mt{margin-top:5px}
+  .foot{margin-top:8px}
+}
 </style></head>
 <body>
 <div id="app"></div>
 <script>
 (function () {
 'use strict';
-var VER = '1.4.0', POLL_MS = 10000, ONLINE_MS = 60000, STALE_AI_MS = 15 * 60000;
+var VER = '1.4.1', POLL_MS = 10000, ONLINE_MS = 60000, STALE_AI_MS = 15 * 60000;
 var THEMES = [['ghost', '고스트'], ['black', '블랙'], ['slatelight', '슬레이트 라이트'], ['chillwhite', '칠화이트'], ['night', '나이트'], ['gold', '금박']];
 var S = { isDef: false, manual: false, conn: null, snap: null, fetchedAt: 0, err: '', theme: 'slatelight', wake: true, sheet: false, confirmOff: false, codeErr: '' };
 var app = document.getElementById('app'), wl = null, timer = null, busy = false;
